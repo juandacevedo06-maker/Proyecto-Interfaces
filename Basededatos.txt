@@ -1,0 +1,152 @@
+CREATE DATABASE tienda DEFAULT CHARACTER SET utf8mb4;
+USE tienda;
+
+-- Usuarios del sistema
+CREATE TABLE Tb_Usuarios (
+  id_Usuario    INT          NOT NULL AUTO_INCREMENT,
+  User_Nombre   VARCHAR(45)  NOT NULL,
+  User_Apellido VARCHAR(45)  NOT NULL,
+  User_Email    VARCHAR(100) NOT NULL UNIQUE,
+  User_Password VARCHAR(255) NOT NULL,  -- BCrypt hash
+  PRIMARY KEY (id_Usuario)
+) ENGINE=InnoDB;
+
+-- Listas de compras (entidad propia)
+CREATE TABLE Tb_Listas (
+  id_Lista      INT          NOT NULL AUTO_INCREMENT,
+  fk_Creador    INT          NOT NULL,
+  Lista_Nombre  VARCHAR(100) NOT NULL,
+  Codigo_Compartir VARCHAR(20) UNIQUE,  -- para compartir por enlace
+  Fecha_Creacion DATETIME    DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id_Lista),
+  CONSTRAINT fk_lista_creador FOREIGN KEY (fk_Creador) REFERENCES Tb_Usuarios(id_Usuario)
+) ENGINE=InnoDB;
+
+-- Miembros que tienen acceso a una lista
+CREATE TABLE Tb_Lista_Miembros (
+  id_Miembro    INT NOT NULL AUTO_INCREMENT,
+  fk_Lista      INT NOT NULL,
+  fk_Usuario    INT NOT NULL,
+  PRIMARY KEY (id_Miembro),
+  UNIQUE KEY uq_lista_usuario (fk_Lista, fk_Usuario),
+  CONSTRAINT fk_miembro_lista    FOREIGN KEY (fk_Lista)   REFERENCES Tb_Listas(id_Lista) ON DELETE CASCADE,
+  CONSTRAINT fk_miembro_usuario  FOREIGN KEY (fk_Usuario) REFERENCES Tb_Usuarios(id_Usuario)
+) ENGINE=InnoDB;
+
+-- Catálogo de productos
+CREATE TABLE Tb_Productos (
+  id_Producto       INT          NOT NULL AUTO_INCREMENT,
+  Producto_Nombre   VARCHAR(100) NOT NULL,
+  Producto_Categoria VARCHAR(50) DEFAULT NULL,
+  PRIMARY KEY (id_Producto)
+) ENGINE=InnoDB;
+
+-- Items dentro de cada lista
+CREATE TABLE Tb_Lista_Items (
+  id_Item       INT            NOT NULL AUTO_INCREMENT,
+  fk_Lista      INT            NOT NULL,
+  fk_Producto   INT            NOT NULL,
+  fk_Agregado_Por INT          NOT NULL,
+  fk_Comprado_Por INT          DEFAULT NULL,
+  Cantidad      DECIMAL(10,2)  NOT NULL DEFAULT 1,
+  Unidad        VARCHAR(45)    DEFAULT 'unidad',
+  Comprado      TINYINT(1)     DEFAULT 0,
+  Fecha_Agregado DATETIME      DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id_Item),
+  CONSTRAINT fk_item_lista     FOREIGN KEY (fk_Lista)       REFERENCES Tb_Listas(id_Lista) ON DELETE CASCADE,
+  CONSTRAINT fk_item_producto  FOREIGN KEY (fk_Producto)    REFERENCES Tb_Productos(id_Producto),
+  CONSTRAINT fk_item_agregado  FOREIGN KEY (fk_Agregado_Por) REFERENCES Tb_Usuarios(id_Usuario),
+  CONSTRAINT fk_item_comprado  FOREIGN KEY (fk_Comprado_Por) REFERENCES Tb_Usuarios(id_Usuario)
+) ENGINE=InnoDB;
+
+
+-- Usuarios
+INSERT INTO Tb_Usuarios (User_Nombre, User_Apellido, User_Email, User_Password) VALUES
+('Carlos',   'Mendoza',  'carlos@email.com',  'hash_clave123'),
+('Ana',      'García',   'ana@email.com',      'hash_pass456'),
+('Luis',     'Torres',   'luis@email.com',     'hash_luis789'),
+('Valentina','Ríos',     'vale@email.com',     'hash_vale321'),
+('Jorge',    'Peña',     'jorge@email.com',    'hash_jorge000');
+
+-- Productos
+INSERT INTO Tb_Productos (Producto_Nombre, Producto_Categoria) VALUES
+('Leche entera',       'Lácteos'),
+('Queso mozzarella',   'Lácteos'),
+('Yogur natural',      'Lácteos'),
+('Pan tajado',         'Panadería'),
+('Pan integral',       'Panadería'),
+('Croissant',          'Panadería'),
+('Pollo entero',       'Carnes'),
+('Carne molida',       'Carnes'),
+('Chorizo',            'Carnes'),
+('Arroz blanco',       'Granos'),
+('Lentejas',           'Granos'),
+('Pasta espagueti',    'Granos'),
+('Tomate',             'Verduras'),
+('Cebolla',            'Verduras'),
+('Ajo',                'Verduras'),
+('Zanahoria',          'Verduras'),
+('Manzana',            'Frutas'),
+('Banano',             'Frutas'),
+('Naranja',            'Frutas'),
+('Aceite de oliva',    'Despensa'),
+('Sal',                'Despensa'),
+('Azúcar',             'Despensa'),
+('Café molido',        'Bebidas'),
+('Jugo de naranja',    'Bebidas'),
+('Agua en botella',    'Bebidas');
+
+-- Listas
+INSERT INTO Tb_Listas (fk_Creador, Lista_Nombre, Codigo_Compartir, Fecha_Creacion) VALUES
+(1, 'Mercado semanal',      'ABC123', '2025-05-01 09:00:00'),
+(2, 'Fiesta del viernes',   'XYZ789', '2025-05-03 14:30:00'),
+(3, 'Lista del mes',        'MNO456', '2025-05-05 08:00:00'),
+(1, 'Desayunos semana',     'DEF321', '2025-05-06 07:45:00');
+
+-- Miembros de cada lista (creador + invitados)
+INSERT INTO Tb_Lista_Miembros (fk_Lista, fk_Usuario) VALUES
+-- Lista 1: Carlos creó, Ana y Luis se unieron
+(1, 1), (1, 2), (1, 3),
+-- Lista 2: Ana creó, Valentina y Jorge se unieron
+(2, 2), (2, 4), (2, 5),
+-- Lista 3: Luis creó, Carlos se unió
+(3, 3), (3, 1),
+-- Lista 4: Carlos creó solo
+(4, 1);
+
+-- Items de las listas
+INSERT INTO Tb_Lista_Items (fk_Lista, fk_Producto, fk_Agregado_Por, fk_Comprado_Por, Cantidad, Unidad, Comprado) VALUES
+-- Lista 1: Mercado semanal
+(1,  1, 1, 1,    2,   'litros',  1),  -- Leche, agregó Carlos, ya comprada
+(1,  4, 1, NULL, 1,   'unidad',  0),  -- Pan tajado, pendiente
+(1,  7, 2, 2,    1,   'unidad',  1),  -- Pollo, agregó Ana, ya comprado
+(1, 10, 2, NULL, 3,   'kg',      0),  -- Arroz, pendiente
+(1, 13, 3, NULL, 4,   'unidades',0),  -- Tomate, agregó Luis, pendiente
+(1, 14, 3, NULL, 2,   'unidades',0),  -- Cebolla, pendiente
+(1, 20, 1, 1,    1,   'botella', 1),  -- Aceite, ya comprado
+(1, 22, 2, NULL, 500, 'g',       0),  -- Azúcar, pendiente
+
+-- Lista 2: Fiesta del viernes
+(2,  6, 2, 2,    6,   'unidades',1),  -- Croissant, ya comprado
+(2,  9, 4, NULL, 1,   'kg',      0),  -- Chorizo, pendiente
+(2, 11, 4, NULL, 500, 'g',       0),  -- Lentejas, pendiente
+(2, 17, 5, 5,    2,   'kg',      1),  -- Manzana, ya comprada
+(2, 18, 5, NULL, 1,   'kg',      0),  -- Banano, pendiente
+(2, 23, 2, 2,    1,   'bolsa',   1),  -- Café, ya comprado
+(2, 24, 4, NULL, 2,   'litros',  0),  -- Jugo naranja, pendiente
+
+-- Lista 3: Lista del mes
+(3,  2, 3, NULL, 400, 'g',       0),  -- Queso, pendiente
+(3,  3, 1, 1,    4,   'unidades',1),  -- Yogur, ya comprado
+(3,  8, 3, NULL, 1,   'kg',      0),  -- Carne molida, pendiente
+(3, 12, 1, NULL, 500, 'g',       0),  -- Espagueti, pendiente
+(3, 15, 3, 3,    1,   'cabeza',  1),  -- Ajo, ya comprado
+(3, 21, 1, NULL, 1,   'bolsa',   0),  -- Sal, pendiente
+
+-- Lista 4: Desayunos semana
+(4,  1, 1, NULL, 3,   'litros',  0),  -- Leche
+(4,  4, 1, 1,    2,   'unidades',1),  -- Pan tajado, ya comprado
+(4,  5, 1, NULL, 1,   'unidad',  0),  -- Pan integral, pendiente
+(4, 17, 1, NULL, 1,   'kg',      0),  -- Manzana
+(4, 19, 1, 1,    2,   'kg',      1),  -- Naranja, ya comprada
+(4, 23, 1, NULL, 1,   'bolsa',   0);  -- Café
